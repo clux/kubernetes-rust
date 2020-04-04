@@ -115,12 +115,18 @@ impl CrBuilder {
 /// Make Resource useable on CRDs without k8s_openapi
 impl From<CustomResource> for Resource {
     fn from(c: CustomResource) -> Self {
+        use crate::api::resource::ResourceScope;
+        let scope = if let Some(ns) = c.namespace {
+            ResourceScope::Namespace(ns)
+        } else {
+            ResourceScope::All
+        };
         Self {
             api_version: c.api_version,
             kind: c.kind,
             group: c.group,
             version: c.version,
-            namespace: c.namespace,
+            scope,
         }
     }
 }

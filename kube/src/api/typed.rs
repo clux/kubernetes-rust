@@ -29,13 +29,31 @@ pub struct Api<K> {
     pub(crate) phantom: PhantomData<K>,
 }
 
+use crate::api::resource::{ClusterScopedResource, NamespaceScopedResource};
+
 /// Expose same interface as Api for controlling scope/group/versions/ns
 impl<K> Api<K>
 where
     K: k8s_openapi::Resource,
 {
-    /// Cluster level resources, or resources viewed across all namespaces
-    pub fn all(client: Client) -> Self {
+    /// Cluster level resources
+    pub fn cluster(client: Client) -> Self
+    where
+        K: ClusterScopedResource,
+    {
+        let api = Resource::cluster::<K>();
+        Self {
+            api,
+            client,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Namespaced resources viewed across all namespaces
+    pub fn all(client: Client) -> Self
+    where
+        K: NamespaceScopedResource,
+    {
         let api = Resource::all::<K>();
         Self {
             api,
@@ -45,7 +63,10 @@ where
     }
 
     /// Namespaced resource within a given namespace
-    pub fn namespaced(client: Client, ns: &str) -> Self {
+    pub fn namespaced(client: Client, ns: &str) -> Self
+    where
+        K: NamespaceScopedResource,
+    {
         let api = Resource::namespaced::<K>(ns);
         Self {
             api,
@@ -79,6 +100,7 @@ where
     /// }
     /// ```
     pub async fn get(&self, name: &str) -> Result<K> {
+        assert!(self.api.scope != crate::api::resource::ResourceScope::All);
         let req = self.api.get(name)?;
         self.client.request::<K>(req).await
     }
@@ -126,6 +148,7 @@ where
     where
         K: Serialize,
     {
+        assert!(self.api.scope != crate::api::resource::ResourceScope::All);
         let bytes = serde_json::to_vec(&data)?;
         let req = self.api.create(&pp, bytes)?;
         self.client.request::<K>(req).await
