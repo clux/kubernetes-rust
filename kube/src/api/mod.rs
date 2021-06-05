@@ -4,10 +4,12 @@
 mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 #[cfg(feature = "ws")] pub use remote_command::AttachedProcess;
+#[cfg(feature = "ws")] mod portforward;
+#[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
 mod subresource;
 #[cfg(feature = "ws")]
-pub use subresource::{AttachParams, Attachable, Executable};
+pub use subresource::{AttachParams, Attachable, Executable, Portforwardable};
 pub use subresource::{EvictParams, Evictable, LogParams, Loggable, ScaleSpec, ScaleStatus};
 
 // Re-exports from kube-core

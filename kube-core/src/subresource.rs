@@ -324,3 +324,40 @@ impl Request {
         req.body(vec![]).map_err(Error::HttpError)
     }
 }
+
+// ----------------------------------------------------------------------------
+// Portforward subresource
+// ----------------------------------------------------------------------------
+#[cfg(feature = "ws")]
+impl Request {
+    /// Request to forward ports of a pod
+    pub fn portforward(&self, name: &str, ports: &[u16]) -> Result<http::Request<Vec<u8>>> {
+        // TODO Validate that the number of ports is < 128. Channel is u8 and each port need 2 channels.
+        if ports.is_empty() {
+            return Err(Error::RequestValidation("ports cannot be empty".into()));
+        }
+
+        if ports.len() > 1 {
+            let mut seen = std::collections::HashSet::with_capacity(ports.len());
+            for port in ports.iter() {
+                if seen.contains(port) {
+                    return Err(Error::RequestValidation(format!(
+                        "ports must be unique, found multiple {}",
+                        port
+                    )));
+                }
+                seen.insert(port);
+            }
+        }
+
+        let base_url = format!("{}/{}/portforward?", self.url_path, name);
+        let mut qp = url::form_urlencoded::Serializer::new(base_url);
+        qp.append_pair(
+            "ports",
+            &ports.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(","),
+        );
+
+        let req = http::Request::get(qp.finish());
+        req.body(vec![]).map_err(Error::HttpError)
+    }
+}

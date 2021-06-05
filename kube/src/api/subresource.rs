@@ -16,6 +16,7 @@ pub use kube_core::subresource::{EvictParams, LogParams};
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
+#[cfg(feature = "ws")] use crate::api::portforward::Portforwarder;
 #[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
@@ -296,5 +297,38 @@ where
         let req = self.request.exec(name, command, ap)?;
         let stream = self.client.connect(req).await?;
         Ok(AttachedProcess::new(stream, ap))
+    }
+}
+
+#[cfg(feature = "ws")]
+#[test]
+fn portforward_path() {
+    use crate::api::{Request, Resource};
+    use k8s_openapi::api::core::v1 as corev1;
+    let url = corev1::Pod::url_path(&(), Some("ns"));
+    let req = Request::new(url).portforward("foo", &[80, 1234]).unwrap();
+    assert_eq!(
+        req.uri(),
+        "/api/v1/namespaces/ns/pods/foo/portforward?&ports=80%2C1234"
+    );
+}
+
+/// Marker trait for objects that has portforward
+#[cfg(feature = "ws")]
+pub trait Portforwardable {}
+
+#[cfg(feature = "ws")]
+impl Portforwardable for k8s_openapi::api::core::v1::Pod {}
+
+#[cfg(feature = "ws")]
+impl<K> Api<K>
+where
+    K: Clone + DeserializeOwned + Portforwardable,
+{
+    /// Forward ports of a pod
+    pub async fn portforward(&self, name: &str, ports: &[u16]) -> Result<Portforwarder> {
+        let req = self.request.portforward(name, ports)?;
+        let stream = self.client.connect(req).await?;
+        Ok(Portforwarder::new(stream, ports))
     }
 }
